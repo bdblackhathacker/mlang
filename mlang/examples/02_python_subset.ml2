@@ -1,0 +1,19 @@
+let nums = [1, 2, 3];
+print nums;
+print len(nums);
+for i in range(3) {
+  print i;
+}
+for x in nums {
+  print x + 1;
+}
+let s = "hi" + "!";
+print s;
+fwrite("hello.txt", "hello");
+let t = fread("hello.txt");
+print t;
+try {
+  print nums[99];
+} catch {
+  print "bad-index";
+}

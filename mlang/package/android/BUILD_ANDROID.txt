@@ -1,0 +1,8 @@
+# Build the Android APK (needs Linux + Android SDK/NDK; ~30-60 min first run).
+# Requires: pip install buildozer, Android cmdline-tools, NDK 25b, logo.png saved.
+#   1. Save logo: mlang/package/assets/logo.png ; python3 mlang/package/assets/make_icon.py
+#   2. Create Kivy launcher entry: mlang/package/android/main.py (already here, CLI demo)
+#   3. cd mlang/package/android && buildozer -v android debug
+#   4. bin/mlang-*-debug.apk  <- install on device, icon = icon-512.png (uncomment in spec)
+# NOTE: APK runs the MLang demo via Kivy launcher; full CLI-in-APK needs Chaquopy/p4a
+# service packaging. Linux CLI remains the primary interface.

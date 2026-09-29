@@ -1,0 +1,7 @@
+let n = 5;
+let r = 1;
+while n > 1 {
+  r = r * n;
+  n = n - 1;
+}
+print r;

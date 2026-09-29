@@ -1,0 +1,24 @@
+name: build
+on: [push, workflow_dispatch]
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pyinstaller && pyinstaller --noconfirm --onefile --name mlang mlang/cli.py
+      - uses: actions/upload-artifact@v4
+        with: { name: mlang-linux, path: dist/mlang }
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      # save the chat logo as mlang/package/assets/logo.png before pushing for the icon
+      - run: pip install pyinstaller pillow
+      - run: python mlang/package/assets/make_icon.py
+      - run: pyinstaller --noconfirm --onefile --name mlang --icon mlang/package/assets/icon.ico mlang/cli.py
+      - uses: actions/upload-artifact@v4
+        with: { name: mlang-windows, path: dist/mlang.exe }

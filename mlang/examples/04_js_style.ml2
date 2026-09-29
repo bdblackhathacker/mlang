@@ -1,0 +1,15 @@
+var total = 0;
+function add(a, b) {
+  return a + b;
+}
+log add(2, 3);
+for i in range(3) {
+  log i;
+  total = total + i;
+}
+log total;
+if total == 3 {
+  log "js-style-ok";
+} else {
+  log "bad";
+}

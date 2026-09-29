@@ -1,0 +1,9 @@
+[project]
+name = "mlang"
+version = "2.2.0"
+description = "MLang all-frontends native compiler CLI"
+requires-python = ">=3.10"
+[project.scripts]
+mlang = "cli:main"
+[tool.setuptools]
+py-modules = []

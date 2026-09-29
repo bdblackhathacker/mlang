@@ -1,0 +1,9 @@
+# Build the Windows .exe WITH the MLANG logo icon (run ON Windows).
+# Requires: Python 3.10+, pip install pyinstaller pillow, logo.png saved.
+#   1. Save logo:  mlang\package\assets\logo.png   (from chat image)
+#   2. cd <repo root>
+#   3. python mlang\package\assets\make_icon.py
+#   4. pyinstaller --noconfirm --onefile --name mlang --icon mlang\package\assets\icon.ico mlang\cli.py
+#   5. dist\mlang.exe  <- double-clickable CLI with logo icon
+# Verify:  dist\mlang.exe version
+#          dist\mlang.exe run mlang\examples\04_js_style.ml2

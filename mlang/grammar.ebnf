@@ -1,0 +1,64 @@
+(* MLang2 Grammar - EBNF, all styles: let|var, def|function, print|log *)
+(* Entry: program = { import | funcdef | classdef | stmt } *)
+
+program      = { import_stmt | funcdef | classdef | stmt } ;
+
+import_stmt  = "import" , ident , ";" ;
+funcdef      = ("def" | "function") , ident , "(" , [ ident , { "," , ident } ] , ")" , block ;
+classdef     = "class" , ident , "{" , { fielddecl | funcdef } , "}" ;
+fielddecl    = ident , ";" ;
+
+block        = "{" , { stmt } , "}" ;
+stmt         = let_stmt | assign_stmt | print_stmt | if_stmt | while_stmt
+             | for_range | for_in | return_stmt | call_stmt | method_call_stmt
+             | field_set | index_set | try_stmt | throw_stmt | import_stmt ;
+
+let_stmt     = ("let" | "var") , ident , "=" , expr , ";" ;
+assign_stmt  = ident , "=" , expr , ";" ;
+print_stmt   = ("print" | "log") , expr , ";" ;
+if_stmt      = "if" , expr , block , [ "else" , block ] ;
+while_stmt   = "while" , expr , block ;
+for_range    = "for" , ident , "in" , "range" , "(" , expr , [ "," , expr ] , ")" , block ;
+for_in       = "for" , ident , "in" , expr , block ;
+return_stmt  = "return" , expr , ";" ;
+call_stmt    = ident , "(" , [ expr , { "," , expr } ] , ")" , ";" ;
+method_call_stmt = ident , "." , ident , "(" , [ expr , { "," , expr } ] , ")" , ";" ;
+field_set    = ident , "." , ident , "=" , expr , ";" ;
+index_set    = ident , "[" , expr , "]" , "=" , expr , ";" ;
+try_stmt     = "try" , block , "catch" , block ;
+throw_stmt   = "throw" , expr , ";" ;
+
+expr         = or_expr ;
+or_expr      = and_expr , { "or" , and_expr } ;
+and_expr     = cmp_expr , { "and" , cmp_expr } ;
+cmp_expr     = add_expr , { ("==" | "!=" | "<" | "<=" | ">" | ">=") , add_expr } ;
+add_expr     = mul_expr , { ("+" | "-") , mul_expr } ;
+mul_expr     = unary , { ("*" | "/" | "%") , unary } ;
+unary        = [ "-" | "not" | "~" | "!" ] , atom ;
+atom         = number | string | bool | none | var | call | method | field_access
+             | index_access | list_lit | "(" , expr , ")" | new_expr | len_call
+             | fread_call | fwrite_call | input_call | sqrt_call ;
+number       = digit , { digit } ;
+string       = '"' , { char_no_quote | escape } , '"' ;
+bool         = "true" | "false" ;
+none         = "none" ;
+var          = ident ;
+call         = ident , "(" , [ expr , { "," , expr } ] , ")" ;
+method       = ident , "." , ident , "(" , [ expr , { "," , expr } ] , ")" ;
+field_access = ident , "." , ident ;
+index_access = ident , "[" , expr , "]" ;
+list_lit     = "[" , [ expr , { "," , expr } ] , "]" ;
+new_expr     = "new" , ident , "(" , ")" ;
+len_call     = "len" , "(" , expr , ")" ;
+fread_call   = "fread" , "(" , expr , ")" ;
+fwrite_call  = ("fwrite" | "fappend") , "(" , expr , "," , expr , ")" ;
+input_call   = "input" , "(" , [ expr ] , ")" ;
+sqrt_call    = "sqrt" , "(" , expr , ")" ;
+
+ident        = letter , { letter | digit | "_" } ;
+digit        = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+letter       = "A".."Z" | "a".."z" | "_" ;
+
+(* Lexical: whitespace + // line and /* block */ comments skipped.
+   Keywords: let print if else while for in range def return class new
+             try catch throw import len true false none and or not *)
