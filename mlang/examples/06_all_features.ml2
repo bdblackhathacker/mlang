@@ -1,0 +1,44 @@
+let n = 0;
+while n < 3 {
+  print n;
+  n = n + 1;
+}
+do {
+  print n;
+  n = n - 1;
+} while n > 0;
+if n == 0 {
+  print "zero";
+} elif n == 1 {
+  print "one";
+} else if n == 2 {
+  print "two";
+} else {
+  print "other";
+}
+function twice(x) {
+  return x * 2;
+}
+print twice(21);
+let nums = [3, 1, 2, 1];
+print nums;
+let s = set(nums);
+print s;
+print len(s);
+print has(s, 2);
+print has(s, 9);
+class Animal {
+  legs;
+}
+class Dog extends Animal {
+  name;
+}
+let d = new Dog();
+d.legs = 4;
+print d.legs;
+interface Named {
+}
+class Cat implements Named {
+  tag;
+}
+print "iface-ok";

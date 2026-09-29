@@ -12,8 +12,8 @@ Usage: python3 mlang2.py prog.ml2 [-o out] [--run] [--keep-c]
 """
 import re, subprocess, sys, os
 
-KWS={"let","var","print","log","if","else","while","for","in","range","def","function","return","class","new",
-"try","catch","throw","import","len","true","false","none","and","or","not"}
+KWS={"let","var","print","log","if","else","elif","while","do","for","in","range","def","function","return","class","extends","interface","implements","new",
+"try","catch","throw","import","len","set","has","true","false","none","and","or","not"}
 
 class Err(Exception): pass
 
@@ -65,14 +65,15 @@ class P:
         k,x,l,c=self.nx()
         if x!=v: raise self.e(f"expected {v!r}",(k,x,l,c))
     def parse(self):
-        gl=[]; funcs=[]; classes=[]
+        gl=[]; funcs=[]; classes=[]; ifaces=[]
         while self.pk()[0]!="eof":
             if self.pk()[0]=="kw" and self.pk()[1]=="import":
                 self.nx(); _,m,_,_=self.nx(); self.xp(";"); gl.append(("import",m))
             elif self.pk()[0]=="kw" and self.pk()[1] in ("def","function"): funcs.append(self.p_def())
             elif self.pk()[0]=="kw" and self.pk()[1]=="class": classes.append(self.p_class())
+            elif self.pk()[0]=="kw" and self.pk()[1]=="interface": ifaces.append(self.p_iface())
             else: gl.append(self.p_stmt())
-        return gl,funcs,classes
+        return gl,funcs,classes,ifaces
     def p_def(self):
         self.nx(); _,n,_,_=self.nx(); self.xp("("); a=[]  # def|function already consumed
         if not (self.pk()[0]=="op" and self.pk()[1]==")"):
@@ -83,13 +84,32 @@ class P:
         while not (self.pk()[0]=="op" and self.pk()[1]=="}"): b.append(self.p_stmt())
         self.xp("}"); return ("def",n,a,b)
     def p_class(self):
-        self.xp("class"); _,n,_,_=self.nx(); self.xp("{"); fields=[]; methods=[]
+        self.xp("class"); _,n,_,_=self.nx()
+        parent=None; impl=[]
+        if self.pk()[0]=="kw" and self.pk()[1]=="extends":
+            self.nx(); _,parent,_,_=self.nx()
+        if self.pk()[0]=="kw" and self.pk()[1]=="implements":
+            self.nx(); _,im,_,_=self.nx(); impl.append(im)
+            while self.pk()[0]=="op" and self.pk()[1]==",":
+                self.nx(); _,im,_,_=self.nx(); impl.append(im)
+        self.xp("{"); fields=[]; methods=[]
         while not (self.pk()[0]=="op" and self.pk()[1]=="}"):
             if self.pk()[0]=="kw" and self.pk()[1] in ("def","function"): methods.append(self.p_def())
             else:
                 # field: id ;
                 _,f,_,_=self.nx(); self.xp(";"); fields.append(f)
-        self.xp("}"); return ("class",n,fields,methods)
+        self.xp("}"); return ("class",n,parent,impl,fields,methods)
+    def p_iface(self):
+        self.xp("interface"); _,n,_,_=self.nx(); self.xp("{"); sigs=[]
+        while not (self.pk()[0]=="op" and self.pk()[1]=="}"):
+            _,m,_,_=self.nx(); self.xp("(")
+            args=[]
+            if not (self.pk()[0]=="op" and self.pk()[1]==")"):
+                _,a,_,_=self.nx(); args.append(a)
+                while self.pk()[0]=="op" and self.pk()[1]==",":
+                    self.nx(); _,a,_,_=self.nx(); args.append(a)
+            self.xp(")"); self.xp(";"); sigs.append((m,args))
+        self.xp("}"); return ("iface",n,sigs)
     def p_stmt(self):
         k,v,l,c=self.pk()
         if k=="kw" and v in ("let","var"):
@@ -104,16 +124,35 @@ class P:
             self.nx(); e=self.p_expr(); self.xp("{"); a=[]
             while not (self.pk()[0]=="op" and self.pk()[1]=="}"): a.append(self.p_stmt())
             self.xp("}")
-            b=None
-            if self.pk()[0]=="kw" and self.pk()[1]=="else":
-                self.nx(); self.xp("{"); b=[]
-                while not (self.pk()[0]=="op" and self.pk()[1]=="}"): b.append(self.p_stmt())
-                self.xp("}")
+            # elif / else if chains desugar to nested if in else
+            def chain():
+                if self.pk()[0]=="kw" and self.pk()[1]=="elif":
+                    self.nx(); e2=self.p_expr(); self.xp("{"); a2=[]
+                    while not (self.pk()[0]=="op" and self.pk()[1]=="}"): a2.append(self.p_stmt())
+                    self.xp("}")
+                    return [("if",e2,a2,chain(),(l,c))]
+                if self.pk()[0]=="kw" and self.pk()[1]=="else":
+                    self.nx()
+                    if self.pk()[0]=="kw" and self.pk()[1]=="if":
+                        self.nx(); e2=self.p_expr(); self.xp("{"); a2=[]
+                        while not (self.pk()[0]=="op" and self.pk()[1]=="}"): a2.append(self.p_stmt())
+                        self.xp("}")
+                        return [("if",e2,a2,chain(),(l,c))]
+                    self.xp("{"); b=[]
+                    while not (self.pk()[0]=="op" and self.pk()[1]=="}"): b.append(self.p_stmt())
+                    self.xp("}"); return b
+                return None
+            b=chain()
             return ("if",e,a,b,(l,c))
         if k=="kw" and v=="while":
             self.nx(); e=self.p_expr(); self.xp("{"); a=[]
             while not (self.pk()[0]=="op" and self.pk()[1]=="}"): a.append(self.p_stmt())
             self.xp("}"); return ("while",e,a,(l,c))
+        if k=="kw" and v=="do":
+            self.nx(); self.xp("{"); a=[]
+            while not (self.pk()[0]=="op" and self.pk()[1]=="}"): a.append(self.p_stmt())
+            self.xp("}"); self.xp("while"); e=self.p_expr(); self.xp(";")
+            return ("dowhile",a,e,(l,c))
         if k=="kw" and v=="for":
             self.nx(); _,var,_,_=self.nx(); self.xp("in")
             # range(...) or array var
@@ -206,6 +245,10 @@ class P:
         if k=="kw" and v=="none": return ("none",)
         if k=="kw" and v=="len":
             self.xp("("); e=self.p_expr(); self.xp(")"); return ("len",e)
+        if k=="kw" and v=="set":
+            self.xp("("); e=self.p_expr(); self.xp(")"); return ("call","set",[e])
+        if k=="kw" and v=="has":
+            self.xp("("); a=self.p_expr(); self.xp(","); b=self.p_expr(); self.xp(")"); return ("call","has",[a,b])
         if k=="kw" and v=="range": raise self.e("range() only in for-in")
         if k=="id":
             if self.pk()[0]=="op" and self.pk()[1]=="(":
@@ -272,6 +315,8 @@ static Val v_idx(Val v,Val k){ if(v.t==V_ARR){ if(k.i<0||k.i>=v.a.n){snprintf(__
 static Val v_fread(Val p){ FILE*f=fopen(p.s,"r"); if(!f){snprintf(__emsg,512,"cannot open %s",p.s);if(__inj)longjmp(__jb,1); Val e=v_str("");return e;} fseek(f,0,SEEK_END);long n=ftell(f);fseek(f,0,SEEK_SET);char*b=malloc(n+1);fread(b,1,n,f);b[n]=0;fclose(f);Val v={V_STR,0,b,{0,0},0};return v;}
 static Val v_fwrite(Val p,Val d){ FILE*f=fopen(p.s,"w"); if(!f){snprintf(__emsg,512,"cannot write %s",p.s);if(__inj)longjmp(__jb,1);return v_int(-1);} const char *s = d.t==V_STR?d.s:"?"; if(d.t==V_INT){fprintf(f,"%lld",d.i);} else fputs(s,f); fclose(f); return v_int(0);}
 static Val v_fappend(Val p,Val d){ FILE*f=fopen(p.s,"a"); if(!f){snprintf(__emsg,512,"cannot append %s",p.s);if(__inj)longjmp(__jb,1);return v_int(-1);} if(d.t==V_INT)fprintf(f,"%lld",d.i); else fputs(d.s,f); fclose(f); return v_int(0);}
+static Val v_set(Val v){ if(v.t!=V_ARR){snprintf(__emsg,512,"set() needs a list");if(__inj)longjmp(__jb,1);fprintf(stderr,"set() needs a list\n");exit(1);} Val r=v_arr(v.a.n); int m=0; for(int i=0;i<v.a.n;i++){int seen=0; for(int j=0;j<m;j++) if(r.a.d[j]==v.a.d[i]){seen=1;break;} if(!seen) r.a.d[m++]=v.a.d[i];} r.a.n=m; return r;}
+static Val v_has(Val v,Val k){ if(v.t==V_ARR){for(int i=0;i<v.a.n;i++) if(v.a.d[i]==k.i) return v_int(1); return v_int(0);} if(v.t==V_STR&&k.t==V_STR) return v_int(strstr(v.s,k.s)!=0); snprintf(__emsg,512,"has() bad types");if(__inj)longjmp(__jb,1);fprintf(stderr,"has() bad types\n");exit(1);}
 static Val v_input(Val pr){ if(pr.t==V_STR) printf("%s",pr.s); fflush(stdout); char b[1024]; if(!fgets(b,1024,stdin)) return v_str(""); b[strcspn(b,"\n")]=0; return v_str(b);}
 static Val v_sqrt(Val x){ char b[64]; snprintf(b,64,"%g",sqrt((double)x.i)); return v_str(b);}
 static char* cstr(Val v){ static char b[64]; if(v.t==V_INT){snprintf(b,64,"%lld",v.i);return b;} if(v.t==V_STR) return v.s; return "?";}
@@ -280,10 +325,31 @@ static char* cstr(Val v){ static char b[64]; if(v.t==V_INT){snprintf(b,64,"%lld"
 def cstr_lit(s):
     return '"'+s.replace("\\","\\\\").replace('"','\\"').replace("\n","\\n")+'"'
 
-def gen(gl,funcs,classes):
+def gen(gl,funcs,classes,ifaces):
     sig={n:len(a) for _,n,a,_ in funcs}
-    # class map
-    cmap={n:(f,m) for _,n,f,m in classes}
+    # class map + interface map
+    cmap={n:(par,imp,f,m) for _,n,par,imp,f,m in classes}
+    imap={n:ss for _,n,ss in ifaces}
+    # resolve field inheritance (parent fields first)
+    resolved={}
+    def fields_of(n, seen=()):
+        if n in resolved: return resolved[n]
+        if n not in cmap: raise Err(f"unknown class {n!r}")
+        if n in seen: raise Err(f"class inheritance cycle at {n!r}")
+        par,imp,f,m=cmap[n]
+        pf=fields_of(par, seen+(n,)) if par else []
+        for x in f:
+            if x in pf: raise Err(f"field {x!r} redefined in class {n!r}")
+        resolved[n]=pf+f; return resolved[n]
+    for _,n,par,imp,f,m in classes:
+        if par and par not in cmap: raise Err(f"class {n!r} extends unknown {par!r}")
+        fields_of(n)
+        for ii in imp:
+            if ii not in imap: raise Err(f"class {n!r} implements unknown interface {ii!r}")
+            need=[s for s,_ in imap[ii]]
+            have=[d[1] for d in m]
+            missing=[s for s in need if s not in have]
+            if missing: raise Err(f"class {n!r} missing interface {ii} methods {missing} (methods phase 2)")
     declared=set()
     var_class={}
     for s in gl:
@@ -334,6 +400,12 @@ def gen(gl,funcs,classes):
             if n in ("input",): return f"v_input({E(args[0]) if args else 'v_str(\"\")'})"
             if n in ("sqrt",): return f"v_sqrt({E(args[0])})"
             if n in ("str",): return f"v_str(cstr({E(args[0])}))"
+            if n in ("set",):
+                if len(args)!=1: raise Err("set() takes 1 list")
+                return f"v_set({E(args[0])})"
+            if n in ("has",):
+                if len(args)!=2: raise Err("has() takes 2 args")
+                return f"v_has({E(args[0])},{E(args[1])})"
             if n not in sig: raise Err(f"unknown func {n}")
             return f"{n}("+",".join(E(a) for a in args)+")"
         if t=="method":
@@ -390,6 +462,10 @@ def gen(gl,funcs,classes):
             _,e,a,_=s; L=[pad+f"while(v_bool({E(e)})){{"]
             for x in a: L+=S(x,lvl+1)
             L.append(pad+"}"); return L
+        if k=="dowhile":
+            _,a,e,_=s; L=[pad+"do{"]
+            for x in a: L+=S(x,lvl+1)
+            L.append(pad+f"}}while(v_bool({E(e)}));"); return L
         if k=="forrange":
             _,var,args,body,_=s
             if len(args)==1: lo="v_int(0)"; hi=E(args[0])
@@ -425,13 +501,14 @@ def gen(gl,funcs,classes):
         if k=="throw":
             return [pad+"{"+f'snprintf(__emsg,512,"%s",cstr({E(s[1])})); if(__inj)longjmp(__jb,1); fprintf(stderr,"throw: %s\\n",__emsg); exit(1);'+"}"]
         raise Err(f"bad stmt {k}")
-    # class C structs (phase 1: fields only, no methods/inheritance yet)
+    # class C structs (fields + single extends; methods/interface-bodies phase 2)
     cdef=[]
-    for _,n,fields,methods in classes:
+    for _,n,par,imp,fields,methods in classes:
         if methods:
             raise Err(f"class {n} methods not yet in native backend (phase 2: use functions + structs for now)")
-        cdef.append(f"typedef struct {n} {{ "+" ".join(f"Val {f};" for f in fields)+" } "+n+";")
-        cdef.append(f"static Val ml_new_{n}(){{ {n}*o=calloc(1,sizeof({n})); "+" ".join(f"o->{f}=v_int(0);" for f in fields)+ " Val v={V_OBJ,0,0,{0,0},o}; return v; }")
+        full=fields_of(n)
+        cdef.append(f"typedef struct {n} {{ "+" ".join(f"Val {f};" for f in full)+" } "+n+";")
+        cdef.append(f"static Val ml_new_{n}(){{ {n}*o=calloc(1,sizeof({n})); "+" ".join(f"o->{f}=v_int(0);" for f in full)+ " Val v={V_OBJ,0,0,{0,0},o}; return v; }")
     # Build functions
     fdecl=[]
     for _,n,a,body in funcs:
@@ -455,8 +532,8 @@ def gen(gl,funcs,classes):
 def compile_file(path,out=None,keep=False):
     src=open(path).read()
     toks=lex(src,path)
-    gl,funcs,classes=P(toks,path).parse()
-    ccode=gen(gl,funcs,classes)
+    gl,funcs,classes,ifaces=P(toks,path).parse()
+    ccode=gen(gl,funcs,classes,ifaces)
     cpath=path+".gen.c"; open(cpath,"w").write(ccode)
     out=out or os.path.splitext(path)[0]
     r=subprocess.run(["cc","-O2","-Wall","-Wno-unused",cpath,"-o",out,"-lm"],capture_output=True,text=True)
