@@ -1,5 +1,7 @@
 # MLang — Programming Language, Compilers, VM, Tools, Kernel
 
+![MLang logo](mlang/package/assets/logo.png)
+
 MLang is a hobby programming-language project with **all frontends in one repo**:
 a secret-opcode VM, assemblers, two native compilers (C-like + Python/JS-like),
 a unified CLI, cross-platform packaging (Linux / Windows / Android), and a
