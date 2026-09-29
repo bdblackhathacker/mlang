@@ -77,6 +77,108 @@ Operators: `+ - * / % & | ^ == != < <= > >= and or not - ~ !`.
 `/` and `%` by zero, out-of-range index, bad `len()`, missing file ->
 nearest `catch`, else exit(1).
 
+## How it works
+
+Two pipelines, one repo:
+
+**A. Native path** (`.ml2` / `.ml` -> real binary):
+`lex()` turns source into tokens with line/col ->
+`P().parse()` builds statements/expressions (precedence: `or/and/cmp/add/mul/unary`) ->
+`gen()` emits C (MLang2 uses a `Val` tagged union: int/str/list/object, so
+`print`/`+`/`len` work on any type; `mlangc` emits plain `long long`) ->
+`cc -O2` compiles to a native ELF binary. Errors carry `file:line:col`.
+
+**B. Secret-VM path** (`.masm2` -> `.mcode2` blob):
+`assemble_text()` maps each logical opcode through a key-derived shuffle
+(`SHA256("M-CODE..."+key)` seeded) so wire bytes differ per key, then XORs
+everything with a `SHA256(key:counter)` stream. Because only `PUSH` carries
+an operand and the mapping is secret, instruction boundaries are hidden
+without the key. `decode()` + `run()` (stack + 256 memory cells + call stack,
+step limit, bounds checks) execute it.
+
+## Example: all code
+
+**1. MLang2 Python-style** (`mlang/examples/02_python_subset.ml2`):
+```js
+let nums = [1, 2, 3];
+print nums;            // [1,2,3]
+print len(nums);       // 3
+for i in range(3) { print i; }       // 0 1 2
+for x in nums { print x + 1; }       // 2 3 4
+let s = "hi" + "!";  print s;        // hi!
+fwrite("hello.txt", "hello");
+let t = fread("hello.txt");  print t;
+try { print nums[99]; } catch { print "bad-index"; }
+```
+
+**2. JS-style aliases** (`mlang/examples/04_js_style.ml2`, same compiler):
+```js
+var total = 0;
+function add(a, b) { return a + b; }
+log add(2, 3);         // 5
+for i in range(3) { log i;  total = total + i; }
+log total;             // 3
+```
+
+**3. Class fields** (`mlang/examples/03_class.ml2`):
+```js
+class Point { x; y; }
+let p = new Point();
+p.x = 3;  p.y = 4;
+print p.x + p.y;       // 7
+```
+
+**4. C-style ints + recursion** (`mlang/examples/05_c_style.ml`, via `mlangc`):
+```c
+def fact(n) {
+  if n <= 1 { return 1; }
+  else { return n * fact(n - 1); }
+}
+let r = fact(5);
+print r;               // 120
+```
+
+**5. Secret-VM assembly** (via `mcode_v2`, needs a key):
+```
+PUSH 5
+STORE 0
+PUSH 1
+STORE 1
+loop:
+LOAD 0
+PUSH 1
+GT
+JZ end
+LOAD 1
+LOAD 0
+MUL
+STORE 1
+LOAD 0
+PUSH 1
+SUB
+STORE 0
+JMP loop
+end:
+LOAD 1
+PRINT_NUM
+HALT
+```
+```
+python3 mlang/cli.py vm mysecret123 prog.masm2   # -> prog.mcode2 (random-looking) + runs it
+python3 mcode.py mykey demo.masm demo.mcode
+```
+
+**6. CLI, packaging, kernel:**
+```
+python3 mlang/cli.py build prog.ml2 -o prog --keep-c -v
+python3 mlang/cli.py run mlang/examples/01_factorial.ml2   # 120
+python3 mlang/cli.py check prog.ml2
+python3 mlang/tests/smoke.py                               # 4/4 OK
+./mlang/package/linux/mlang version
+python3 mlang/package/assets/make_icon.py   # logo.png -> icon.ico + android pngs
+make -C mlang/kernel kernel.elf             # multiboot i386 stub
+```
+
 ## Compilers
 
 | File | Input | Output | Notes |
