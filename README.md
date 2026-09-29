@@ -75,6 +75,8 @@ throw "boom";
 class Point { x; y; }            // fields only (phase 1)
 let p = new Point();
 p.x = 3;  print p.x + p.y;
+print sha256("abc");             // crypto: sha256/b64enc/b64dec/xor/rand
+print b64enc(xor("hi", "K"));
 ```
 
 Operators: `+ - * / % & | ^ == != < <= > >= and or not - ~ !`.

@@ -320,6 +320,19 @@ static Val v_has(Val v,Val k){ if(v.t==V_ARR){for(int i=0;i<v.a.n;i++) if(v.a.d[
 static Val v_input(Val pr){ if(pr.t==V_STR) printf("%s",pr.s); fflush(stdout); char b[1024]; if(!fgets(b,1024,stdin)) return v_str(""); b[strcspn(b,"\n")]=0; return v_str(b);}
 static Val v_sqrt(Val x){ char b[64]; snprintf(b,64,"%g",sqrt((double)x.i)); return v_str(b);}
 static char* cstr(Val v){ static char b[64]; if(v.t==V_INT){snprintf(b,64,"%lld",v.i);return b;} if(v.t==V_STR) return v.s; return "?";}
+/* ---- crypto: SHA-256 (compact, no deps) ---- */
+typedef struct{unsigned h[8];unsigned long long len;unsigned char b[64];int bl;} Sha;
+#define ROR(x,n)(((x)>>(n))|((x)<<(32-(n))))
+static void sha_blk(Sha*c){static const unsigned K[64]={0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2};unsigned w[64];for(int i=0;i<16;i++)w[i]=((unsigned)c->b[i*4]<<24)|((unsigned)c->b[i*4+1]<<16)|((unsigned)c->b[i*4+2]<<8)|c->b[i*4+3];for(int i=16;i<64;i++){unsigned s0=ROR(w[i-15],7)^ROR(w[i-15],18)^(w[i-15]>>3),s1=ROR(w[i-2],17)^ROR(w[i-2],19)^(w[i-2]>>10);w[i]=w[i-16]+s0+w[i-7]+s1;}unsigned a=c->h[0],bb=c->h[1],cc2=c->h[2],d=c->h[3],e=c->h[4],f=c->h[5],g=c->h[6],h=c->h[7];for(int i=0;i<64;i++){unsigned S1=ROR(e,6)^ROR(e,11)^ROR(e,25),ch=(e&f)^(~e&g),t1=h+S1+ch+K[i]+w[i],S0=ROR(a,2)^ROR(a,13)^ROR(a,22),mj=(a&bb)^(a&cc2)^(bb&cc2),t0=S0+mj;h=g;g=f;f=e;e=d+t1;d=cc2;cc2=bb;bb=a;a=t1+t0;}c->h[0]+=a;c->h[1]+=bb;c->h[2]+=cc2;c->h[3]+=d;c->h[4]+=e;c->h[5]+=f;c->h[6]+=g;c->h[7]+=h;c->bl=0;}
+static void sha_upd(Sha*c,const unsigned char*d,int n){c->len+=n;while(n--){c->b[c->bl++]=*d++;if(c->bl==64)sha_blk(c);}}
+static void sha_hex(Sha*c,char o[65]){unsigned long long bits=c->len*8;int pad=c->bl<56?56-c->bl:120-c->bl;unsigned char P=(unsigned char)0x80;sha_upd(c,&P,1);for(int i=1;i<pad;i++){unsigned char Z=0;sha_upd(c,&Z,1);}unsigned char L[8];for(int i=0;i<8;i++)L[i]=(bits>>((7-i)*8))&255;sha_upd(c,L,8);for(int i=0;i<8;i++)snprintf(o+i*8,9,"%08x",c->h[i]);}
+static Val v_sha256(Val v){ if(v.t!=V_STR){snprintf(__emsg,512,"sha256() needs a string");if(__inj)longjmp(__jb,1);fprintf(stderr,"sha256() needs a string\n");exit(1);} Sha c={{0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19},0,{0},0}; sha_upd(&c,(unsigned char*)v.s,strlen(v.s)); char o[65]; sha_hex(&c,o); return v_str(o);}
+static const char*B64C="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static Val v_b64e(Val v){ if(v.t!=V_STR){snprintf(__emsg,512,"b64enc() needs a string");if(__inj)longjmp(__jb,1);exit(1);} int n=strlen(v.s); char*o=malloc(((n+2)/3)*4+1); int j=0; for(int i=0;i<n;i+=3){int b=(v.s[i]&255)<<16; if(i+1<n)b|=(v.s[i+1]&255)<<8; if(i+2<n)b|=v.s[i+2]&255; o[j++]=B64C[(b>>18)&63]; o[j++]=B64C[(b>>12)&63]; o[j++]=i+1<n?B64C[(b>>6)&63]:'='; o[j++]=i+2<n?B64C[b&63]:'=';} o[j]=0; Val r={V_STR,0,o,{0,0},0}; return r;}
+static int b64v(char c){ if(c>='A'&&c<='Z')return c-'A'; if(c>='a'&&c<='z')return c-'a'+26; if(c>='0'&&c<='9')return c-'0'+52; if(c=='+')return 62; if(c=='/')return 63; return -1;}
+static Val v_b64d(Val v){ if(v.t!=V_STR){snprintf(__emsg,512,"b64dec() needs a string");if(__inj)longjmp(__jb,1);exit(1);} int n=strlen(v.s); char*o=malloc(n+1); int j=0; for(int i=0;i<n;i+=4){int b=0,pad=0; for(int k=0;k<4;k++){if(v.s[i+k]=='='){pad++;b<<=6;}else{int q=b64v(v.s[i+k]); if(q<0){snprintf(__emsg,512,"bad base64");if(__inj)longjmp(__jb,1);fprintf(stderr,"bad base64\n");exit(1);} b=(b<<6)|q;}} o[j++]=(b>>16)&255; if(pad<2)o[j++]=(b>>8)&255; if(pad<1)o[j++]=b&255;} o[j]=0; Val r={V_STR,0,o,{0,0},0}; return r;}
+static Val v_xor(Val d,Val k){ if(d.t!=V_STR||k.t!=V_STR||!k.s[0]){snprintf(__emsg,512,"xor(s,key) needs strings, non-empty key");if(__inj)longjmp(__jb,1);fprintf(stderr,"xor() bad args\n");exit(1);} int n=strlen(d.s),m=strlen(k.s); char*o=malloc(n+1); for(int i=0;i<n;i++)o[i]=d.s[i]^k.s[i%m]; o[n]=0; Val r={V_STR,0,o,{0,0},0}; return r;}
+static Val v_rand(Val mx){ if(mx.i<=0){snprintf(__emsg,512,"rand() needs positive max");if(__inj)longjmp(__jb,1);exit(1);} unsigned long long r=0; FILE*f=fopen("/dev/urandom","r"); if(f){fread(&r,1,sizeof r,f);fclose(f);}else{r=(unsigned)rand()*2654435761u;} return v_int(r%mx.i);}
 """
 
 def cstr_lit(s):
@@ -406,6 +419,21 @@ def gen(gl,funcs,classes,ifaces):
             if n in ("has",):
                 if len(args)!=2: raise Err("has() takes 2 args")
                 return f"v_has({E(args[0])},{E(args[1])})"
+            if n in ("sha256",):
+                if len(args)!=1: raise Err("sha256() takes 1 string")
+                return f"v_sha256({E(args[0])})"
+            if n in ("b64enc",):
+                if len(args)!=1: raise Err("b64enc() takes 1 string")
+                return f"v_b64e({E(args[0])})"
+            if n in ("b64dec",):
+                if len(args)!=1: raise Err("b64dec() takes 1 string")
+                return f"v_b64d({E(args[0])})"
+            if n in ("xor",):
+                if len(args)!=2: raise Err("xor() takes (string, key)")
+                return f"v_xor({E(args[0])},{E(args[1])})"
+            if n in ("rand",):
+                if len(args)!=1: raise Err("rand() takes 1 max")
+                return f"v_rand({E(args[0])})"
             if n not in sig: raise Err(f"unknown func {n}")
             return f"{n}("+",".join(E(a) for a in args)+")"
         if t=="method":

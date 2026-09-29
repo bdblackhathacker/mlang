@@ -41,7 +41,7 @@ mul_expr     = unary , { ("*" | "/" | "%") , unary } ;
 unary        = [ "-" | "not" | "~" | "!" ] , atom ;
 atom         = number | string | bool | none | var | call | method | field_access
              | index_access | list_lit | "(" , expr , ")" | new_expr | len_call
-             | set_call | has_call
+             | set_call | has_call | sha_call | b64_call | xor_call | rand_call
              | fread_call | fwrite_call | input_call | sqrt_call ;
 number       = digit , { digit } ;
 string       = '"' , { char_no_quote | escape } , '"' ;
@@ -57,6 +57,10 @@ new_expr     = "new" , ident , "(" , ")" ;
 len_call     = "len" , "(" , expr , ")" ;
 set_call     = "set" , "(" , expr , ")" ;
 has_call     = "has" , "(" , expr , "," , expr , ")" ;
+sha_call     = "sha256" , "(" , expr , ")" ;
+b64_call     = ("b64enc" | "b64dec") , "(" , expr , ")" ;
+xor_call     = "xor" , "(" , expr , "," , expr , ")" ;
+rand_call    = "rand" , "(" , expr , ")" ;
 fread_call   = "fread" , "(" , expr , ")" ;
 fwrite_call  = ("fwrite" | "fappend") , "(" , expr , "," , expr , ")" ;
 input_call   = "input" , "(" , [ expr ] , ")" ;

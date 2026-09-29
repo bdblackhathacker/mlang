@@ -1,0 +1,13 @@
+let msg = "hello mlang";
+print sha256(msg);
+print sha256("abc");
+let enc = xor(msg, "K");
+print b64enc(enc);
+let back = b64dec(b64enc(enc));
+if back == enc {
+  print "xor-b64-roundtrip-ok";
+} else {
+  print "roundtrip-FAIL";
+}
+print rand(100);
+print len(sha256("x"));

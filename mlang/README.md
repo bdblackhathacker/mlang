@@ -73,6 +73,7 @@ let s2 = input("name: ");    // stdin line
 print sqrt(16);              // math helper (string result)
 try { print a[99]; } catch { print "bad"; }  // div0/index/len/fopen errors
 throw "boom";                // user throw -> nearest catch else exit(1)
+print sha256("abc");         // crypto (no deps): sha256/b64enc/b64dec/xor/rand
 class Point { x; y; }        // fields only (phase 1)
 let p = new Point();         // heap object
 p.x = 3; print p.x + p.y;
