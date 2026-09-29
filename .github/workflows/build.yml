@@ -38,4 +38,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/bdblackhathacker/mlang:2.2.0,ghcr.io/bdblackhathacker/mlang:latest
+          tags: ghcr.io/bdblackhathacker/mlang:2.3.0,ghcr.io/bdblackhathacker/mlang:latest

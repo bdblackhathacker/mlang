@@ -1,6 +1,6 @@
 [project]
 name = "mlang"
-version = "2.2.0"
+version = "2.3.0"
 description = "MLang all-frontends native compiler CLI"
 authors = [{ name = "Shiboshree Roy" }]
 requires-python = ">=3.10"

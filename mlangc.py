@@ -232,7 +232,10 @@ def compile_file(path, out=None, keep_c=False):
     cpath=path+".gen.c"
     open(cpath,"w").write(ccode)
     out=out or (os.path.splitext(path)[0])
-    r=subprocess.run(["cc","-O2","-Wall",cpath,"-o",out],capture_output=True,text=True)
+    try:
+        r=subprocess.run(["cc","-O2","-Wall",cpath,"-o",out],capture_output=True,text=True)
+    except FileNotFoundError:
+        raise RuntimeError("no C compiler found: install gcc (Linux: apt install gcc) or MinGW (Windows: https://www.mingw-w64.org)")
     if r.returncode!=0: raise RuntimeError("cc failed:\n"+r.stderr)
     if not keep_c: os.remove(cpath)
     else: print(f"[+] kept {cpath}")

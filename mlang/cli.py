@@ -18,7 +18,7 @@ SRC=os.path.join(HERE,"src")
 sys.path.insert(0,SRC)
 import mlang2
 
-VERSION="mlang 2.2.0 (all frontends) — Designed & Developed by Shiboshree Roy"
+VERSION="mlang 2.3.0 (all frontends) — Designed & Developed by Shiboshree Roy"
 
 def backend(path):
     if path.endswith(".ml2"): return "ml2"

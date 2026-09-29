@@ -564,7 +564,10 @@ def compile_file(path,out=None,keep=False):
     ccode=gen(gl,funcs,classes,ifaces)
     cpath=path+".gen.c"; open(cpath,"w").write(ccode)
     out=out or os.path.splitext(path)[0]
-    r=subprocess.run(["cc","-O2","-Wall","-Wno-unused",cpath,"-o",out,"-lm"],capture_output=True,text=True)
+    try:
+        r=subprocess.run(["cc","-O2","-Wall","-Wno-unused",cpath,"-o",out,"-lm"],capture_output=True,text=True)
+    except FileNotFoundError:
+        raise Err("no C compiler found: install gcc (Linux: apt install gcc) or MinGW (Windows: https://www.mingw-w64.org)")
     if r.returncode!=0: raise Err("cc failed:\n"+r.stderr+"\n---C---\n"+ccode[:4000])
     if not keep: os.remove(cpath)
     else: print(f"[+] kept {cpath}")
