@@ -1,5 +1,7 @@
 # MLang — Real-World Native Compiler
 
+> Designed & Developed by **Shiboshree Roy**
+
 MLang2 is a small Python-like language that compiles to C then to a native ELF via `cc -O2`.
 
 ## Layout
